@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' http://localhost:3001 https://oneev.indexim.id data:; connect-src 'self' http://localhost:3001 https://oneev.indexim.id https://indexsafemission_api.indexim.id;">
+    <title>Xafetaria Dashboard - Professional Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen p-4 sm:p-6 lg:p-8">
+    <!-- Animated Background -->
+    <div class="background-shapes">
+        <div></div><div></div><div></div><div></div><div></div>
+    </div>
+
+    <!-- Barcode Input (Hidden) -->
+    <input type="text" id="barcode-input" class="absolute -left-full">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-4rem)] relative z-10">
+        <!-- Main Content Area (Left) -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            <!-- Header Section -->
+            <header class="card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
+                <div class="flex items-center gap-4 flex-1">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-lg opacity-60 blur"></div>
+                        <div class="relative bg-gray-900 p-1 rounded-lg">
+                            <img
+                                src="assets/app-logo.jpeg"
+                                alt="Logo Kantin"
+                                class="h-10 w-10 rounded-md object-cover"
+                                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                            >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-400 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M3 6a3 3 0 013-3h2.25a3 3 0 013 3v2.25a3 3 0 01-3 3H6a3 3 0 01-3-3V6zM15.75 6a3 3 0 013-3H21a3 3 0 013 3v2.25a3 3 0 01-3 3h-2.25a3 3 0 01-3-3V6zM3 17.25a3 3 0 013-3h2.25a3 3 0 013 3V21a3 3 0 01-3 3H6a3 3 0 01-3-3v-2.25zM16.5 17.25a3 3 0 013-3H21a3 3 0 013 3V21a3 3 0 01-3 3h-1.5a3 3 0 01-3-3v-2.25z"/></svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 id="app-title" class="text-2xl sm:text-3xl font-bold">Xafetaria</h1>
+                        <p class="text-sm text-gray-400">Sesi: <span id="current-session" class="text-theme font-semibold">LOADING...</span></p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="clock" class="text-3xl font-bold">00:00</div>
+                    <div id="date" class="text-sm text-gray-400">Loading...</div>
+                    <div class="mt-2 flex flex-wrap justify-end gap-2 text-xs">
+                        <div class="inline-flex items-center gap-2 rounded-full bg-black/25 px-3 py-1 border border-white/10">
+                            <span id="api-status-dot" class="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
+                            <span id="api-status-text" class="text-gray-300">API: cek...</span>
+                        </div>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-black/25 px-3 py-1 border border-white/10">
+                            <span id="db-status-dot" class="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
+                            <span id="db-status-text" class="text-gray-300">DB: cek...</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Visitor Count Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
+                <div id="card-pagi" class="card group cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Makan Pagi</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                    </div>
+                    <p id="count-pagi" class="text-4xl font-bold bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent">0</p>
+                    <div class="mt-2 text-xs text-gray-500">Pengunjung</div>
+                </div>
+
+                <div id="card-siang" class="card group cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Makan Siang</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 18c-3.3 0-6 2.7-6 6h12c0-3.3-2.7-6-6-6zm-9-2h18v-2H3v2zm0-4h18V9H3v3zm0-7v2h18V2H3z"/></svg>
+                    </div>
+                    <p id="count-siang" class="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text text-transparent">0</p>
+                    <div class="mt-2 text-xs text-gray-500">Pengunjung</div>
+                </div>
+
+                <div id="card-malam" class="card group cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Makan Malam</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M9.5.5c-4.979 0-9 3.956-9 8.824 0 4.868 4.021 8.824 9 8.824s9-3.956 9-8.824c0-4.868-4.021-8.824-9-8.824zm0 15.848c-3.866 0-7-3.037-7-6.924 0-3.886 3.134-6.924 7-6.924s7 3.038 7 6.924c0 3.887-3.134 6.924-7 6.924z"/></svg>
+                    </div>
+                    <p id="count-malam" class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent">0</p>
+                    <div class="mt-2 text-xs text-gray-500">Pengunjung</div>
+                </div>
+            </div>
+
+            <!-- Scan Result Area -->
+            <div id="scan-result-card" class="card status-info flex-grow flex flex-col justify-center items-center text-center p-8 transition-all duration-500 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-2xl"></div>
+                
+                <div id="scan-placeholder" class="relative z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mb-4 mx-auto text-gray-400 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    <h2 id="scan-status-message" class="text-3xl font-bold text-gray-300">Scan Barcode Karyawan</h2>
+                    <p class="text-sm text-gray-500 mt-2">Arahkan barcode ke pemindai</p>
+                </div>
+
+                <div id="employee-details" class="w-full flex-col items-center text-center opacity-0 max-h-0 transition-all duration-500 ease-in-out overflow-hidden relative z-10">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="flex flex-col gap-6 h-full">
+            <!-- Menu Images -->
+            <div class="card h-1/2 flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold">Menu Hari Ini</h3>
+                        <p class="text-xs text-gray-500">Gambar menu harian</p>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </div>
+                <div class="slideshow-container flex-grow h-full">
+                    <div id="slideshow-track" class="slideshow-track h-full">
+                        <p class="m-auto text-gray-500 text-sm">Tidak ada gambar menu</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meal Plan -->
+            <div class="card h-1/2 flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold">Meal Plan</h3>
+                        <p class="text-xs text-gray-500"><span id="meal-plan-session" class="text-theme">...</span></p>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                </div>
+                <div id="meal-plan-content" class="space-y-2 overflow-y-auto pr-2 flex-grow text-sm">
+                     <p class="m-auto text-gray-500">Tidak ada meal plan</p>
+                </div>
+                <div class="border-t border-gray-700 mt-4 pt-3 flex justify-between items-center flex-shrink-0">
+                    <span class="text-sm font-semibold text-gray-400">Total Kalori</span>
+                    <span id="total-calories" class="text-xl font-bold text-theme">0 kkal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Button -->
+    <button id="settings-btn" class="fixed bottom-8 right-8 bg-gradient-to-br from-teal-500 to-cyan-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 z-50 group">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+    </button>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 flex justify-center items-center p-4 z-50">
+        <div class="card glass-effect w-full max-w-6xl max-h-[90vh] flex flex-col border border-purple-500/20">
+            <div class="flex justify-between items-center mb-6 flex-shrink-0 pb-4 border-b border-gray-700">
+                <div>
+                    <h2 class="text-3xl font-bold">Settings</h2>
+                    <p class="text-sm text-gray-400 mt-1">Kelola pengaturan aplikasi</p>
+                </div>
+                <button id="close-settings-btn" class="text-gray-400 hover:text-white text-4xl leading-none transition-colors">&times;</button>
+            </div>
+
+            <div class="flex-grow flex gap-6 overflow-hidden">
+                <!-- Tab Navigation -->
+                <div class="w-1/4 flex-shrink-0 flex flex-col gap-2 border-r border-gray-700 pr-6">
+                    <button data-tab="umum" class="settings-tab active-tab text-left w-full p-3 rounded-lg font-semibold transition-all duration-300">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
+                            Umum
+                        </div>
+                    </button>
+                    <button data-tab="gambar" class="settings-tab text-left w-full p-3 rounded-lg font-semibold transition-all duration-300">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            Gambar Menu
+                        </div>
+                    </button>
+                    <button data-tab="riwayat" class="settings-tab text-left w-full p-3 rounded-lg font-semibold transition-all duration-300">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Riwayat Scan
+                        </div>
+                    </button>
+                    <button data-tab="laporan" class="settings-tab text-left w-full p-3 rounded-lg font-semibold transition-all duration-300">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Laporan & Import
+                        </div>
+                    </button>
+                    <button data-tab="log" class="settings-tab text-left w-full p-3 rounded-lg font-semibold transition-all duration-300">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Log Error
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="flex-grow flex flex-col overflow-hidden pl-6">
+                    <!-- Tab: Pengaturan Umum -->
+                    <div id="tab-umum" class="settings-tab-content overflow-y-auto flex-grow">
+                        <form id="app-settings-form" class="space-y-6">
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Nama Aplikasi</label>
+                                    <input type="text" id="app-name" class="w-full" placeholder="Kantin Digital">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Deskripsi</label>
+                                    <input type="text" id="app-description" class="w-full" placeholder="Sistem Manajemen Kantin Digital">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-300 mb-3">Warna Tema</label>
+                                <div class="flex gap-3">
+                                    <input type="color" id="theme-color" class="w-12 h-12 rounded-lg cursor-pointer" value="#667eea">
+                                    <div class="flex-1">
+                                        <p id="theme-color-text" class="text-sm text-gray-400">#667eea</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="reset" id="reset-theme-btn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Reset Default</button>
+                                <button type="submit" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-2 px-4 rounded-lg transition-all">Simpan</button>
+                            </div>
+                            <div id="save-indicator" class="text-green-400 opacity-0 transition-opacity flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                                <span>Tersimpan</span>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tab: Kelola Meal Plan -->
+                    <div id="tab-meal-plan" class="settings-tab-content overflow-y-auto flex-grow hidden">
+                        <div class="mb-6">
+                            <label class="block text-sm font-semibold text-gray-300 mb-2">Pilih Tanggal</label>
+                            <input type="date" id="meal-plan-date-picker" class="w-full sm:w-48">
+                        </div>
+                        <div id="meal-plan-editor" class="space-y-6">
+                            <!-- Generated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Tab: Gambar Menu -->
+                    <div id="tab-gambar" class="settings-tab-content overflow-y-auto flex-grow hidden space-y-6">
+                        <form id="image-upload-form" class="space-y-4">
+                            <h3 class="font-semibold text-lg">Upload Gambar Menu Baru</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Tanggal</label>
+                                    <input type="date" id="image-date" class="w-full" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Nama Menu</label>
+                                    <input type="text" id="image-name" class="w-full" placeholder="Cth: Ayam Bakar" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Pilih Gambar</label>
+                                    <input type="file" id="image-file" accept="image/*" class="w-full" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-2 px-4 rounded-lg transition-all">Upload</button>
+                        </form>
+
+                        <div class="mt-8">
+                            <h3 class="text-lg font-bold mb-4">Galeri Hari Ini</h3>
+                            <div id="image-gallery" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <p class="col-span-full text-gray-500">Tidak ada gambar</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Riwayat Scan -->
+                    <div id="tab-riwayat" class="settings-tab-content overflow-y-auto flex-grow hidden">
+                        <h3 class="text-lg font-bold mb-4">Riwayat Scan Hari Ini</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-xs font-semibold text-gray-300 uppercase bg-gray-700/50 sticky top-0">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Waktu</th>
+                                        <th class="px-4 py-3 text-left">NIK</th>
+                                        <th class="px-4 py-3 text-left">Nama</th>
+                                        <th class="px-4 py-3 text-left">Perusahaan</th>
+                                        <th class="px-4 py-3 text-left">Sesi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scan-history-body">
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-3 text-gray-500 text-center">Belum ada data</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Laporan & Import -->
+                    <div id="tab-laporan" class="settings-tab-content overflow-y-auto flex-grow hidden space-y-6">
+                        <form id="report-form" class="space-y-4">
+                            <h3 class="font-semibold text-lg">Download Laporan Pengunjung</h3>
+                            <p class="text-sm text-gray-400">Ekspor data pengunjung dalam format Excel</p>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Dari Tanggal</label>
+                                    <input type="date" id="start-date" class="w-full" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-300 mb-2">Sampai Tanggal</label>
+                                    <input type="date" id="end-date" class="w-full" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition-all">Download Excel</button>
+                        </form>
+
+                        <form id="meal-plan-upload-form" class="space-y-4 pt-4 border-t border-gray-700">
+                            <h3 class="font-semibold text-lg">Import Meal Plan</h3>
+                            <p class="text-sm text-gray-400">Upload file Excel untuk update menu mingguan</p>
+                            <input type="file" id="meal-plan-file" accept=".xlsx,.xls" class="w-full" required>
+                            <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-all">Import</button>
+                        </form>
+                    </div>
+
+                    <!-- Tab: Log Error -->
+                    <div id="tab-log" class="settings-tab-content overflow-y-auto flex-grow hidden">
+                        <div class="flex items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold">Log Error Aplikasi</h3>
+                                <p class="text-sm text-gray-400">Menampilkan error scan dan error sistem untuk tracing.</p>
+                            </div>
+                            <button id="refresh-error-logs-btn" type="button" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Refresh</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-xs font-semibold text-gray-300 uppercase bg-gray-700/50 sticky top-0">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Waktu</th>
+                                        <th class="px-4 py-3 text-left">Level</th>
+                                        <th class="px-4 py-3 text-left">Sumber</th>
+                                        <th class="px-4 py-3 text-left">Pesan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="error-log-body">
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-3 text-gray-500 text-center">Belum ada log error.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="opacity-0"></div>
+
+    <!-- JavaScript -->
+    <script src="renderer.js"></script>
+</body>
+</html>
