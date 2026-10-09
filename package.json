@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win nsis"
+    "build:win": "electron-builder --win",
+    "build:exe": "electron-builder --win"
   },
   "author": "Lulus Bagos Hermawan",
   "license": "MIT",
@@ -25,7 +26,6 @@
   "build": {
     "appId": "com.kantin.dashboard",
     "productName": "Kantin Dashboard",
-    "artifactName": "Kantin-Dashboard-Setup-${version}.${ext}",
     "files": [
       "src/**/*",
       "database/**/*",
@@ -41,15 +41,22 @@
     },
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "portable",
+        "dir"
       ],
+      "signAndEditExecutable": false,
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Kantin-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Kantin-Portable-${version}.${ext}"
     }
   }
 }

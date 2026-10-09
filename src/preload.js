@@ -6,6 +6,9 @@ const { contextBridge, ipcRenderer } = require('electron');
  * * Di sini, kita membuat objek global `window.api` yang bisa diakses di renderer.js.
  */
 contextBridge.exposeInMainWorld('api', {
+    // Play native system warning beep
+    playSystemBeep: () => ipcRenderer.send('play-system-beep'),
+
     // Fungsi untuk memanggil endpoint di backend menggunakan metode GET
     get: (url) => fetch(`http://localhost:${process.env.SERVER_PORT || 3001}${url}`).then(res => res.json()),
 
@@ -63,20 +66,3 @@ contextBridge.exposeInMainWorld('api', {
 ipcRenderer.on('show-error-dialog', (event, { title, content }) => {
     dialog.showErrorBox(title, content);
 });
-
-// Menambahkan listener di proses Main untuk menangani penyimpanan file
-// Ini harus ada di main.js, tapi kita bisa memicunya dari sini.
-// Pastikan Anda menambahkan kode ini di main.js:
-/*
-ipcMain.on('save-dialog', (event, { filename, buffer }) => {
-    dialog.showSaveDialog({
-        title: 'Simpan Laporan Excel',
-        defaultPath: filename,
-        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
-    }).then(result => {
-        if (!result.canceled && result.filePath) {
-            require('fs').writeFileSync(result.filePath, buffer);
-        }
-    });
-});
-*/
