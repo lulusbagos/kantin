@@ -58,6 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
             mealPlanUpload: document.getElementById('meal-plan-upload-form'),
         },
         toast: document.getElementById('toast'),
+        sound: {
+            headerToggleBtn: document.getElementById('header-sound-toggle-btn'),
+            headerSoundIcon: document.getElementById('header-sound-icon'),
+            headerSoundLabel: document.getElementById('header-sound-label'),
+            settingsVoiceCheckbox: document.getElementById('settings-voice-enabled'),
+            testVoiceBtn: document.getElementById('btn-test-voice'),
+        },
         sync: {
             headerModeBadge: document.getElementById('header-offline-mode-badge'),
             headerQueueBtn: document.getElementById('header-sync-queue-btn'),
@@ -90,6 +97,152 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getEl(id) {
         return document.getElementById(id);
+    }
+
+    // ==========================================
+    // Voice Synthesizer & Audio Feedback (Bahasa Indonesia)
+    // Sapaan ramah kasir menyebut NAMA DEPAN saja
+    // ==========================================
+    let isVoiceEnabled = localStorage.getItem('kantin_voice_enabled') !== 'false';
+
+    function updateSoundToggleUI() {
+        const icon = elements.sound?.headerSoundIcon;
+        const label = elements.sound?.headerSoundLabel;
+        const btn = elements.sound?.headerToggleBtn;
+        const checkbox = elements.sound?.settingsVoiceCheckbox;
+
+        if (checkbox) checkbox.checked = isVoiceEnabled;
+        if (icon) icon.textContent = isVoiceEnabled ? '🔊' : '🔇';
+        if (label) label.textContent = isVoiceEnabled ? 'Suara: ON' : 'Suara: OFF';
+        if (btn) {
+            if (isVoiceEnabled) {
+                btn.classList.remove('text-rose-400', 'border-rose-500/30', 'bg-rose-500/10');
+                btn.classList.add('text-gray-300', 'border-white/10', 'bg-black/25');
+            } else {
+                btn.classList.remove('text-gray-300', 'border-white/10', 'bg-black/25');
+                btn.classList.add('text-rose-400', 'border-rose-500/30', 'bg-rose-500/10');
+            }
+        }
+    }
+
+    function setVoiceEnabled(enabled) {
+        isVoiceEnabled = !!enabled;
+        localStorage.setItem('kantin_voice_enabled', isVoiceEnabled ? 'true' : 'false');
+        updateSoundToggleUI();
+        if (!isVoiceEnabled && ('speechSynthesis' in window)) {
+            window.speechSynthesis.cancel();
+        }
+    }
+
+    /**
+     * Ekstraksi Nama Depan saja dari nama lengkap karyawan
+     * Mengabaikan singkatan/gelar kehormatan (M., DR., H., HJ., dsb.)
+     * Contoh:
+     * - 'NISMAWATI' -> 'Nismawati'
+     * - 'DICO DJAMAL SH' -> 'Dico'
+     * - 'M. SYAIFUL ANWAR' -> 'Syaiful'
+     * - 'DR. H. AHMAD SUBARJO' -> 'Ahmad'
+     */
+    function getFirstName(fullName) {
+        if (!fullName || typeof fullName !== 'string') return '';
+        const clean = fullName.trim().replace(/\s+/g, ' ');
+        if (!clean) return '';
+
+        const tokens = clean.split(' ').map(t => t.replace(/[,]/g, '')).filter(Boolean);
+        if (tokens.length === 0) return '';
+
+        const skipPrefixes = new Set([
+            'M.', 'MD.', 'MOCH.', 'MUCH.', 'MHD.', 'MOH.', 'MUH.',
+            'H.', 'HJ.', 'HAJI', 'HAJJAH',
+            'DR.', 'DRS.', 'DRA.', 'IR.', 'PROF.', 'UST.', 'USTADZ',
+            'TB.', 'R.', 'RA.', 'RADEN'
+        ]);
+
+        let chosen = '';
+        for (const t of tokens) {
+            const upper = t.toUpperCase().replace(/\.+$/, '');
+            const rawUpper = t.toUpperCase();
+            if (skipPrefixes.has(rawUpper) || skipPrefixes.has(upper + '.')) {
+                continue;
+            }
+            if (/^[A-Za-z]\.?$/.test(t)) {
+                continue;
+            }
+            chosen = t;
+            break;
+        }
+
+        if (!chosen) {
+            chosen = tokens[0];
+        }
+
+        const cleanWord = chosen.replace(/[^a-zA-Z]/g, '');
+        if (!cleanWord) return '';
+        return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1).toLowerCase();
+    }
+
+    /**
+     * Menghasilkan bunyi nada responsif via Web Audio API
+     */
+    function playTone(type = 'success') {
+        if (!isVoiceEnabled) return;
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'success') {
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.22);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.22);
+            } else if (type === 'warning') {
+                osc.frequency.setValueAtTime(440, ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.28);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.28);
+            } else {
+                osc.frequency.setValueAtTime(240, ctx.currentTime);
+                osc.frequency.setValueAtTime(180, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            }
+        } catch (_) {}
+    }
+
+    /**
+     * Mengucapkan pesan suara dalam Bahasa Indonesia (SpeechSynthesis)
+     */
+    function speakVoice(text) {
+        if (!isVoiceEnabled || !text) return;
+        if (!('speechSynthesis' in window)) return;
+
+        try {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'id-ID';
+            utterance.rate = 1.05;
+            utterance.pitch = 1.0;
+
+            const voices = window.speechSynthesis.getVoices();
+            const idVoice = voices.find(v => v.lang === 'id-ID' || (v.lang && v.lang.toLowerCase().startsWith('id')));
+            if (idVoice) {
+                utterance.voice = idVoice;
+            }
+
+            window.speechSynthesis.speak(utterance);
+        } catch (err) {
+            console.warn('Speech synthesis error:', err);
+        }
     }
 
     function formatTimeDisplay(timeVal) {
@@ -1044,6 +1197,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Event listener untuk quick sync button di Header
+        // Event listener untuk tombol suara di Header & Settings
+        elements.sound?.headerToggleBtn?.addEventListener('click', () => {
+            setVoiceEnabled(!isVoiceEnabled);
+            showToast(isVoiceEnabled ? 'Suara sapaan aktif (ON)' : 'Suara dimatikan (MUTE)', isVoiceEnabled ? 'success' : 'info');
+            if (isVoiceEnabled) {
+                playTone('success');
+                speakVoice('Suara diaktifkan.');
+            }
+        });
+
+        elements.sound?.settingsVoiceCheckbox?.addEventListener('change', (e) => {
+            setVoiceEnabled(e.target.checked);
+        });
+
+        elements.sound?.testVoiceBtn?.addEventListener('click', () => {
+            playTone('success');
+            speakVoice('Silakan makan, Nismawati.');
+        });
+        updateSoundToggleUI();
+
         elements.sync.headerQueueBtn?.addEventListener('click', () => {
             triggerManualSync();
         });
@@ -1165,12 +1338,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await window.api.post('/api/scan', { nik });
                 if (response.error) throw new Error(response.message);
 
+                // Ambil Nama Depan saja untuk sapaan suara (Voice Synthesizer)
+                const rawEmpName = response.data?.nama_lengkap || response.data?.nama || response.savedRecord?.nama_lengkap || '';
+                const firstName = getFirstName(rawEmpName);
+
                 if (response.status === 'SUCCESS') {
-                    const isOutOfPlan = response.isOutOfPlan || 
+                    const isOutOfPlan = response.isOutOfPlan ||
                         (typeof response.peakmealNotice === 'string' && response.peakmealNotice.includes('DI LUAR PLAN')) ||
                         (response.peakmealNotice && response.peakmealNotice.status === 'OUT_OF_PLAN');
-                    
+
                     const scanType = isOutOfPlan ? 'warning' : (response.rosterNotice?.type === 'error' ? 'error' : 'success');
+
+                    if (isOutOfPlan) {
+                        playTone('warning');
+                        speakVoice(firstName ? `${firstName}, di luar plan. Silakan makan.` : 'Di luar plan. Silakan makan.');
+                    } else {
+                        playTone('success');
+                        speakVoice(firstName ? `Silakan makan, ${firstName}.` : 'Silakan makan.');
+                    }
 
                     showScanResult({
                         type: scanType,
@@ -1186,6 +1371,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     initializeDashboard();
                 } else if (response.status === 'ALREADY_SCANNED') {
+                    playTone('error');
+                    speakVoice(firstName ? `${firstName}, Anda sudah scan sesi ini.` : 'Anda sudah scan sesi ini.');
                     sendAppLog('ERROR', 'SCAN', response.message, {
                         status: response.status,
                         nik,
@@ -1199,6 +1386,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         sesiMakan: elements.currentSession?.textContent
                     });
                 } else if (response.status === 'PEAKMEAL_WRONG_LOCATION') {
+                    playTone('error');
+                    const loc = (response.deliveryLocation || '').replace(/[-_]/g, ' ').trim() || 'lokasi lain';
+                    speakVoice(firstName ? `${firstName}, pesanan Anda di ${loc}.` : `Pesanan Anda di ${loc}.`);
                     sendAppLog('ERROR', 'SCAN', response.message, {
                         status: response.status,
                         nik,
@@ -1212,6 +1402,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         peakmealNotice: response.peakmealNotice
                     });
                 } else if (response.status === 'ROSTER_OFF_REJECTED') {
+                    playTone('error');
+                    speakVoice(firstName ? `${firstName}, jadwal Anda sedang libur.` : 'Jadwal Anda sedang libur.');
                     sendAppLog('ERROR', 'SCAN', response.message, {
                         status: response.status,
                         nik,
@@ -1224,6 +1416,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         rosterNotice: response.rosterNotice
                     });
                 } else if (response.status === 'LIMIT_EXCEEDED') {
+                    playTone('error');
+                    speakVoice(firstName ? `${firstName}, batas makan hari ini sudah habis.` : 'Batas makan hari ini sudah habis.');
                     sendAppLog('ERROR', 'SCAN', response.message, {
                         status: response.status,
                         nik,
@@ -1235,6 +1429,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         details: response.data
                     });
                 } else if (response.status === 'OUT_OF_SESSION') {
+                    playTone('warning');
+                    speakVoice('Di luar jam makan.');
                     sendAppLog('ERROR', 'SCAN', response.message, {
                         status: response.status,
                         nik,
@@ -1246,6 +1442,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         details: response.data
                     });
                 } else {
+                    playTone('error');
+                    speakVoice('Barcode tidak terdaftar.');
                     sendAppLog('ERROR', 'SCAN', response.message || 'Scan gagal', {
                         status: response.status,
                         nik,
@@ -1259,6 +1457,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (error) {
                 console.error('Scan error:', error);
+                playTone('error');
+                speakVoice('Scan gagal.');
                 sendAppLog('ERROR', 'SCAN', error.message || 'Terjadi kesalahan server', { nik });
                 showScanResult({
                     type: 'error',
@@ -1293,6 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (!looksLikeScannerInput(nik)) {
+                    playTone('error');
+                    speakVoice('Gunakan scanner barcode.');
                     sendAppLog('ERROR', 'SCAN', 'Input manual ditolak. Gunakan scanner barcode.', { nik });
                     showScanResult('error', 'Input manual tidak diperbolehkan. Gunakan scanner barcode.');
                     elements.barcodeInput.value = '';
