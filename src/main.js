@@ -1,6 +1,8 @@
 // --- Import Modul yang Dibutuhkan ---
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
+const https = require('https');
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -1040,6 +1042,51 @@ api.post('/api/error-logs', (req, res) => {
     const { level, source, message, context } = req.body || {};
     writeAppLog(level || 'ERROR', source || 'RENDERER', message || 'Client error', context || null);
     res.status(201).json({ success: true });
+});
+
+// GET /api/tts - Text-to-speech audio streaming & cache (Bahasa Indonesia)
+const TTS_CACHE_DIR = path.join(UPLOADS_DIR, 'tts_cache');
+if (!fsSync.existsSync(TTS_CACHE_DIR)) {
+    try { fsSync.mkdirSync(TTS_CACHE_DIR, { recursive: true }); } catch (_) {}
+}
+
+api.get('/api/tts', async (req, res) => {
+    const text = (req.query.q || '').toString().trim();
+    if (!text) {
+        return res.status(400).send('Query parameter q is required');
+    }
+
+    const hash = crypto.createHash('md5').update(text.toLowerCase()).digest('hex');
+    const cachedFilePath = path.join(TTS_CACHE_DIR, `${hash}.mp3`);
+
+    if (fsSync.existsSync(cachedFilePath)) {
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return fsSync.createReadStream(cachedFilePath).pipe(res);
+    }
+
+    const encoded = encodeURIComponent(text);
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=${encoded}`;
+
+    const request = https.get(googleTtsUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    }, (googleRes) => {
+        if (googleRes.statusCode !== 200) {
+            return res.status(googleRes.statusCode).send('Failed to fetch TTS');
+        }
+
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+
+        const fileStream = fsSync.createWriteStream(cachedFilePath);
+        googleRes.pipe(fileStream);
+        googleRes.pipe(res);
+    });
+
+    request.on('error', (err) => {
+        console.warn('TTS request error:', err.message);
+        res.status(502).send('Error connecting to TTS service');
+    });
 });
 
 // GET /api/dashboard-data - Main dashboard data

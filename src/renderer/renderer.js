@@ -271,13 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const encoded = encodeURIComponent(text.trim());
-            const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=${encoded}`;
+            const audioUrl = `http://localhost:3001/api/tts?q=${encoded}`;
             const audio = new Audio(audioUrl);
             audio.playbackRate = 1.05;
             currentVoiceAudio = audio;
 
-            audio.play().catch(() => {
-                speakFallbackSpeechSynthesis(text);
+            audio.play().catch((err) => {
+                console.warn('Internal TTS audio failed, trying fallback:', err);
+                const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=${encoded}`;
+                const fbAudio = new Audio(fallbackUrl);
+                fbAudio.play().catch(() => {
+                    speakFallbackSpeechSynthesis(text);
+                });
             });
         } catch (_) {
             speakFallbackSpeechSynthesis(text);
@@ -1251,6 +1256,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         elements.sound?.testVoiceBtn?.addEventListener('click', () => {
+            const btn = elements.sound?.testVoiceBtn;
+            if (btn) {
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span>🔊</span> Memutar...';
+                btn.classList.add('opacity-75');
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('opacity-75');
+                }, 2200);
+            }
+            showToast('Memutar contoh suara: "Silakan makan, Nismawati."', 'info');
             playTone('success');
             speakVoice('Silakan makan, Nismawati.');
         });
