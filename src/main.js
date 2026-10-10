@@ -2386,7 +2386,237 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
         });
 
 
-        const wsDetail = workbook.addWorksheet('Detail Pengajuan');
+        
+        // Worksheet Stiker Kantong Makanan
+        const wsStickers = workbook.addWorksheet('Stiker Kantong Makanan');
+        wsStickers.columns = [
+            { width: 22 },
+            { width: 32 },
+            { width: 20 },
+            { width: 22 }
+        ];
+        wsStickers.mergeCells('A1:D1');
+        wsStickers.getCell('A1').value = 'STIKER KANTONG TEMPAT MAKANAN & SNACK (PER SESI & DEPARTEMEN)';
+        wsStickers.getCell('A1').font = { bold: true, size: 15, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        wsStickers.getCell('A1').fill = headerFill;
+        wsStickers.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsStickers.mergeCells('A2:D2');
+        wsStickers.getCell('A2').value = `Periode ${startDate} sampai ${endDate} | Siap Cetak & Tempel pada Kantong Tempat Makanan (Label per Sesi & Snack)`;
+        wsStickers.getCell('A2').font = { italic: true, size: 9, color: { argb: 'FF475569' }, name: 'Calibri' };
+        wsStickers.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        let stickerRowIdx = 4;
+        const mealSessionsConfig = [
+            { key: 'BREAKFAST', label: 'BREAKFAST (MAKAN PAGI)', headerColor: 'FFB45309', bodyColor: 'FFFEF3C7', textColor: 'FF92400E' },
+            { key: 'LUNCH', label: 'LUNCH (MAKAN SIANG)', headerColor: 'FF0284C7', bodyColor: 'FFE0F2FE', textColor: 'FF0369A1' },
+            { key: 'DINNER', label: 'DINNER (MAKAN MALAM)', headerColor: 'FF4338CA', bodyColor: 'FFE0E7FF', textColor: 'FF3730A3' },
+            { key: 'SUPPER', label: 'SUPPER (NON-KANTIN / LARUT)', headerColor: 'FF6B21A8', bodyColor: 'FFF3E8FF', textColor: 'FF581C87' }
+        ];
+
+        allDeptNames.forEach(dept => {
+            const deptRecords = records.filter(r => (r.departemen || '-') === dept);
+
+            // 1. Stiker per Sesi Makan
+            mealSessionsConfig.forEach(cfg => {
+                const sessionRows = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL' && normalizeSesi(r.sesi_makan) === cfg.key);
+                if (sessionRows.length === 0) return;
+
+                const locSummaryMap = new Map();
+                sessionRows.forEach(r => {
+                    const l = r.tujuan_pengantaran || r.lokasi_pengantaran || '-';
+                    locSummaryMap.set(l, (locSummaryMap.get(l) || 0) + 1);
+                });
+                const locStr = [...locSummaryMap.entries()].map(([k, v]) => `${k} (${v})`).join('; ');
+
+                const startStickerRow = stickerRowIdx;
+
+                // Header Stiker
+                wsStickers.mergeCells(`A${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellHeader = wsStickers.getCell(`A${stickerRowIdx}`);
+                cellHeader.value = `🔖 STIKER KANTONG - ${cfg.label}`;
+                cellHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+                cellHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cfg.headerColor } };
+                cellHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+                stickerRowIdx++;
+
+                // Departemen
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'DEPARTEMEN';
+                wsStickers.getCell(`A${stickerRowIdx}`).font = { bold: true, name: 'Calibri' };
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellDept = wsStickers.getCell(`B${stickerRowIdx}`);
+                cellDept.value = dept.toUpperCase();
+                cellDept.font = { bold: true, size: 11, color: { argb: cfg.textColor }, name: 'Calibri' };
+                stickerRowIdx++;
+
+                // Sesi & Jumlah
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'SESI / WAKTU';
+                wsStickers.getCell(`B${stickerRowIdx}`).value = cfg.label;
+                wsStickers.getCell(`C${stickerRowIdx}`).value = 'JUMLAH PORSI';
+                wsStickers.getCell(`C${stickerRowIdx}`).font = { bold: true, name: 'Calibri' };
+                const cellQty = wsStickers.getCell(`D${stickerRowIdx}`);
+                cellQty.value = `${sessionRows.length} PORSI`;
+                cellQty.font = { bold: true, size: 13, color: { argb: cfg.textColor }, name: 'Calibri' };
+                cellQty.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cfg.bodyColor } };
+                cellQty.alignment = { horizontal: 'center', vertical: 'middle' };
+                stickerRowIdx++;
+
+                // Tujuan / Lokasi
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'TUJUAN / LOKASI';
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellLoc = wsStickers.getCell(`B${stickerRowIdx}`);
+                cellLoc.value = locStr || '-';
+                cellLoc.font = { italic: true, size: 9, name: 'Calibri' };
+                stickerRowIdx++;
+
+                // Tanggal
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'TANGGAL';
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                wsStickers.getCell(`B${stickerRowIdx}`).value = `${startDate} s/d ${endDate}`;
+                wsStickers.getCell(`B${stickerRowIdx}`).font = { size: 9, name: 'Calibri' };
+
+                // Border Stiker
+                for (let r = startStickerRow; r <= stickerRowIdx; r++) {
+                    for (let c = 1; c <= 4; c++) {
+                        const cell = wsStickers.getCell(r, c);
+                        cell.border = {
+                            top: r === startStickerRow ? { style: 'medium', color: { argb: cfg.headerColor } } : borderThin.top,
+                            bottom: r === stickerRowIdx ? { style: 'medium', color: { argb: cfg.headerColor } } : borderThin.bottom,
+                            left: c === 1 ? { style: 'medium', color: { argb: cfg.headerColor } } : borderThin.left,
+                            right: c === 4 ? { style: 'medium', color: { argb: cfg.headerColor } } : borderThin.right
+                        };
+                    }
+                }
+
+                stickerRowIdx += 2;
+            });
+
+            // 2. Stiker Kantong Snack
+            const snackRecords = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'SNACK');
+            if (snackRecords.length > 0) {
+                const snackLocMap = new Map();
+                snackRecords.forEach(r => {
+                    const l = r.tujuan_pengantaran || r.lokasi_pengantaran || '-';
+                    snackLocMap.set(l, (snackLocMap.get(l) || 0) + 1);
+                });
+                const snackLocStr = [...snackLocMap.entries()].map(([k, v]) => `${k} (${v})`).join('; ');
+
+                const startStickerRow = stickerRowIdx;
+
+                // Header Stiker
+                wsStickers.mergeCells(`A${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellHeader = wsStickers.getCell(`A${stickerRowIdx}`);
+                cellHeader.value = '🍪 STIKER KANTONG - SNACK DEPARTEMEN';
+                cellHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+                cellHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+                cellHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+                stickerRowIdx++;
+
+                // Departemen
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'DEPARTEMEN';
+                wsStickers.getCell(`A${stickerRowIdx}`).font = { bold: true, name: 'Calibri' };
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellDept = wsStickers.getCell(`B${stickerRowIdx}`);
+                cellDept.value = dept.toUpperCase();
+                cellDept.font = { bold: true, size: 11, color: { argb: 'FF065F46' }, name: 'Calibri' };
+                stickerRowIdx++;
+
+                // Jenis & Jumlah
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'JENIS KEBUTUHAN';
+                wsStickers.getCell(`B${stickerRowIdx}`).value = 'SNACK';
+                wsStickers.getCell(`C${stickerRowIdx}`).value = 'JUMLAH KOTAK';
+                wsStickers.getCell(`C${stickerRowIdx}`).font = { bold: true, name: 'Calibri' };
+                const cellQty = wsStickers.getCell(`D${stickerRowIdx}`);
+                cellQty.value = `${snackRecords.length} KOTAK`;
+                cellQty.font = { bold: true, size: 13, color: { argb: 'FF065F46' }, name: 'Calibri' };
+                cellQty.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+                cellQty.alignment = { horizontal: 'center', vertical: 'middle' };
+                stickerRowIdx++;
+
+                // Tujuan
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'TUJUAN / LOKASI';
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellLoc = wsStickers.getCell(`B${stickerRowIdx}`);
+                cellLoc.value = snackLocStr || '-';
+                cellLoc.font = { italic: true, size: 9, name: 'Calibri' };
+                stickerRowIdx++;
+
+                // Tanggal
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'TANGGAL';
+                wsStickers.mergeCells(`B${stickerRowIdx}:D${stickerRowIdx}`);
+                wsStickers.getCell(`B${stickerRowIdx}`).value = `${startDate} s/d ${endDate}`;
+                wsStickers.getCell(`B${stickerRowIdx}`).font = { size: 9, name: 'Calibri' };
+
+                // Border Stiker
+                for (let r = startStickerRow; r <= stickerRowIdx; r++) {
+                    for (let c = 1; c <= 4; c++) {
+                        const cell = wsStickers.getCell(r, c);
+                        cell.border = {
+                            top: r === startStickerRow ? { style: 'medium', color: { argb: 'FF059669' } } : borderThin.top,
+                            bottom: r === stickerRowIdx ? { style: 'medium', color: { argb: 'FF059669' } } : borderThin.bottom,
+                            left: c === 1 ? { style: 'medium', color: { argb: 'FF059669' } } : borderThin.left,
+                            right: c === 4 ? { style: 'medium', color: { argb: 'FF059669' } } : borderThin.right
+                        };
+                    }
+                }
+
+                stickerRowIdx += 2;
+            }
+
+            // 3. Stiker Master Kantong Besar
+            if (deptRecords.length > 0) {
+                const bCount = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL' && normalizeSesi(r.sesi_makan) === 'BREAKFAST').length;
+                const lCount = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL' && normalizeSesi(r.sesi_makan) === 'LUNCH').length;
+                const dCount = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL' && normalizeSesi(r.sesi_makan) === 'DINNER').length;
+                const sCount = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL' && normalizeSesi(r.sesi_makan) === 'SUPPER').length;
+                const snkCount = snackRecords.length;
+
+                const startStickerRow = stickerRowIdx;
+
+                wsStickers.mergeCells(`A${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellMasterHeader = wsStickers.getCell(`A${stickerRowIdx}`);
+                cellMasterHeader.value = `📦 STIKER MASTER KANTONG / DUS - ${dept.toUpperCase()}`;
+                cellMasterHeader.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+                cellMasterHeader.fill = headerFill;
+                cellMasterHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+                stickerRowIdx++;
+
+                wsStickers.mergeCells(`A${stickerRowIdx}:D${stickerRowIdx}`);
+                const cellMasterSub = wsStickers.getCell(`A${stickerRowIdx}`);
+                cellMasterSub.value = `Periode: ${startDate} s/d ${endDate} | Total Isi Kantong Besar`;
+                cellMasterSub.font = { italic: true, size: 9, color: { argb: 'FF475569' }, name: 'Calibri' };
+                cellMasterSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                stickerRowIdx++;
+
+                wsStickers.mergeCells(`A${stickerRowIdx}:C${stickerRowIdx}`);
+                const cellSummary = wsStickers.getCell(`A${stickerRowIdx}`);
+                cellSummary.value = `Breakfast: ${bCount} | Lunch: ${lCount} | Dinner: ${dCount} | Supper: ${sCount} | Snack: ${snkCount}`;
+                cellSummary.font = { bold: true, size: 10, name: 'Calibri' };
+
+                const cellTotal = wsStickers.getCell(`D${stickerRowIdx}`);
+                cellTotal.value = `TOTAL: ${deptRecords.length}`;
+                cellTotal.font = { bold: true, size: 12, color: { argb: 'FF166534' }, name: 'Calibri' };
+                cellTotal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+                cellTotal.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                for (let r = startStickerRow; r <= stickerRowIdx; r++) {
+                    for (let c = 1; c <= 4; c++) {
+                        const cell = wsStickers.getCell(r, c);
+                        cell.border = {
+                            top: r === startStickerRow ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.top,
+                            bottom: r === stickerRowIdx ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.bottom,
+                            left: c === 1 ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.left,
+                            right: c === 4 ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.right
+                        };
+                    }
+                }
+
+                stickerRowIdx += 3;
+            }
+        });
+        wsStickers.views = [{ state: 'frozen', ySplit: 3 }];
+        
+const wsDetail = workbook.addWorksheet('Detail Pengajuan');
         wsDetail.columns = [
             { width: 6 },
             { width: 14 },
