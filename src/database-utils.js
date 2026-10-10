@@ -51,10 +51,11 @@ function normalizeMealSession(sesi) {
 }
 
 function toPeakmealSession(sesi) {
-    const normalized = normalizeMealSession(sesi);
-    if (normalized === 'MAKAN PAGI') return 'PAGI';
-    if (normalized === 'MAKAN MALAM') return 'MALAM';
-    if (normalized === 'MAKAN SIANG') return 'SIANG';
+    const normalized = (sesi || '').toString().trim().toUpperCase();
+    if (normalized.includes('PAGI') || normalized === 'BREAKFAST') return 'BREAKFAST';
+    if (normalized.includes('MALAM') || normalized === 'DINNER') return 'DINNER';
+    if (normalized.includes('SUPPER') || normalized.includes('LARUT')) return 'SUPPER';
+    if (normalized.includes('SIANG') || normalized.includes('LUNCH')) return 'LUNCH';
     return normalized;
 }
 
@@ -189,6 +190,11 @@ async function getEmployeeFromKantinView(pool, nikOrScanCode) {
 
 // Get today's peakmeal data by NIK
 async function getTodayPeakmealByNik(pool, nik, date, sesi = null) {
+    // Supper hanya untuk diajukan saja, tidak untuk makan di aplikasi desktop
+    if (sesi && toPeakmealSession(sesi) === 'SUPPER') {
+        return null;
+    }
+
     const query = `
         SELECT TOP 1
             id,
@@ -204,7 +210,14 @@ async function getTodayPeakmealByNik(pool, nik, date, sesi = null) {
           AND CAST(tanggal_peakmeal AS DATE) = CAST(@date AS DATE)
           AND UPPER(LTRIM(RTRIM(ISNULL(jenis_pengajuan, 'PEAKMEAL')))) = 'PEAKMEAL'
           AND UPPER(LTRIM(RTRIM(ISNULL(status, '')))) <> 'CANCELLED'
-          AND (@sesi IS NULL OR UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, 'SIANG')))) = @sesi)
+          AND UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, '')))) NOT IN ('SUPPER')
+          AND (
+              @sesi IS NULL 
+              OR UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, 'LUNCH')))) = @sesi
+              OR (@sesi IN ('BREAKFAST', 'PAGI') AND UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, '')))) IN ('BREAKFAST', 'PAGI'))
+              OR (@sesi IN ('LUNCH', 'SIANG') AND UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, '')))) IN ('LUNCH', 'SIANG'))
+              OR (@sesi IN ('DINNER', 'MALAM') AND UPPER(LTRIM(RTRIM(ISNULL(sesi_makan, '')))) IN ('DINNER', 'MALAM'))
+          )
         ORDER BY updated_at DESC, created_at DESC
     `;
 

@@ -46,15 +46,62 @@ function normalizeLocationName(value) {
         .replace(/\s+/g, ' ');
 }
 
+function getCanonicalLocation(value) {
+    const norm = normalizeLocationName(value);
+    if (!norm) return '';
+
+    const has12 = /\b12\b/.test(norm) || norm.includes('KM 12') || norm.includes('KM12');
+    const has33 = /\b33\b/.test(norm) || norm.includes('KM 33') || norm.includes('KM33');
+
+    if (has12 && !has33 && (norm.includes('OFFICE') || norm.includes('KANTIN') || norm.includes('PRASMANAN'))) {
+        return 'KANTIN OFFICE 12 PRASMANAN';
+    }
+
+    if (has33 && !has12 && (norm.includes('OFFICE') || norm.includes('KANTIN') || norm.includes('PRASMANAN'))) {
+        return 'KANTIN OFFICE 33 PRASMANAN';
+    }
+
+    return norm;
+}
+
 function getOfficePeakmealLocation(value) {
-    const normalized = normalizeLocationName(value);
-    return OFFICE_PEAKMEAL_LOCATIONS.find(location => normalizeLocationName(location) === normalized) || null;
+    const canonical = getCanonicalLocation(value);
+    return OFFICE_PEAKMEAL_LOCATIONS.find(location => location === canonical) || null;
 }
 
 function isSameDeliveryLocation(orderedLocation, scanLocation) {
     const ordered = normalizeLocationName(orderedLocation);
     const scan = normalizeLocationName(scanLocation);
-    return ordered !== '' && scan !== '' && ordered === scan;
+    if (!ordered || !scan) return false;
+
+    // 1. Exact match setelah normalisasi
+    if (ordered === scan) return true;
+
+    // 2. Canonical match (misal pesanan "KANTIN OFFICE 12 PRASMANAN" dan setting desktop "Kantin Office 12")
+    const canonOrdered = getCanonicalLocation(ordered);
+    const canonScan = getCanonicalLocation(scan);
+    if (canonOrdered && canonScan && canonOrdered === canonScan) {
+        return true;
+    }
+
+    // Hindari salah silang antara angka 12 dan 33
+    const orderedHas12 = /\b12\b/.test(ordered) || ordered.includes('KM 12');
+    const orderedHas33 = /\b33\b/.test(ordered) || ordered.includes('KM 33');
+    const scanHas12 = /\b12\b/.test(scan) || scan.includes('KM 12');
+    const scanHas33 = /\b33\b/.test(scan) || scan.includes('KM 33');
+
+    if ((orderedHas12 && scanHas33) || (orderedHas33 && scanHas12)) {
+        return false;
+    }
+
+    // 3. Substring match jika tidak bertentangan angka 12/33
+    if (ordered.length >= 4 && scan.length >= 4) {
+        if (ordered.includes(scan) || scan.includes(ordered)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function isSpecialBuffetAllowedRoster(roster) {
@@ -1297,7 +1344,9 @@ api.post('/api/scan', async (req, res) => {
                 const peakmeal = await db.getTodayPeakmealByNik(pool, nikKaryawan, today, sesiMakan);
                 if (peakmeal) {
                     const lokasi = peakmeal.lokasi_pengantaran || '-';
-                    if (!configuredOfficeLocation || !isSameDeliveryLocation(lokasi, configuredOfficeLocation)) {
+                    const isLocationMatch = isSameDeliveryLocation(lokasi, appLocation) ||
+                        (configuredOfficeLocation && isSameDeliveryLocation(lokasi, configuredOfficeLocation));
+                    if (!isLocationMatch) {
                         const rosterLabel = roster?.roster_kode || roster?.roster_keterangan || 'WORK';
                         const plainMessage = `User ${karyawan.nama_lengkap || '-'} (${nikKaryawan}) Status ${rosterLabel}. SUDAH DIPESANKAN di area ${lokasi}. Scan di ${appLocation} ditolak.`;
                         const message = `Sudah dipesankan di area ${lokasi}. Scan ditolak.`;
@@ -1484,12 +1533,15 @@ api.post('/api/scan', async (req, res) => {
         if (pool && pool.connected) {
             try {
                 if (isIndexim) {
-                    const peakmeal = await db.getTodayPeakmealByNik(pool, nikKaryawan, today);
+                    const peakmeal = await db.getTodayPeakmealByNik(pool, nikKaryawan, today, sesiMakan);
                     if (peakmeal) {
+                        const isPrasmanan = /PRASMANAN|OFFICE 12|OFFICE 33/i.test(peakmeal.lokasi_pengantaran || '');
                         peakmealNotice = {
                             status: 'IN_PLAN',
                             location: peakmeal.lokasi_pengantaran || '-',
-                            message: `Sudah mengajukan peakmeal diantar ke ${peakmeal.lokasi_pengantaran || '-'}`
+                            message: isPrasmanan
+                                ? `Pesanan Sesuai (${peakmeal.lokasi_pengantaran || '-'}). Silakan menikmati hidangan prasmanan.`
+                                : `Pesanan Sesuai (${peakmeal.lokasi_pengantaran || '-'}).`
                         };
                     }
                 }
@@ -1949,9 +2001,10 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
 
         function normalizeSesi(value) {
             const normalized = String(value || '').trim().toUpperCase();
-            if (normalized.includes('PAGI')) return 'PAGI';
-            if (normalized.includes('MALAM')) return 'MALAM';
-            return 'SIANG';
+            if (normalized.includes('PAGI') || normalized.includes('BREAKFAST')) return 'BREAKFAST';
+            if (normalized.includes('MALAM') || normalized.includes('DINNER')) return 'DINNER';
+            if (normalized.includes('SUPPER')) return 'SUPPER';
+            return 'LUNCH';
         }
 
         function asDateOnly(value) {
@@ -1976,23 +2029,24 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
         const wsSummary = workbook.addWorksheet('Ringkasan Lokasi');
         wsSummary.columns = [
             { width: 6 },
-            { width: 46 },
-            { width: 22 },
-            { width: 22 },
+            { width: 44 },
+            { width: 20 },
+            { width: 20 },
             { width: 14 },
-            { width: 12 },
-            { width: 12 },
-            { width: 10 },
-            { width: 10 },
-            { width: 10 },
-            { width: 12 }
+            { width: 11 },
+            { width: 11 },
+            { width: 11 },
+            { width: 11 },
+            { width: 13 },
+            { width: 14 },
+            { width: 15 }
         ];
-        wsSummary.mergeCells('A1:K1');
+        wsSummary.mergeCells('A1:L1');
         wsSummary.getCell('A1').value = 'REKAP PENGAJUAN PEAKMEAL & SNACK';
         wsSummary.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
         wsSummary.getCell('A1').fill = headerFill;
         wsSummary.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-        wsSummary.mergeCells('A2:K2');
+        wsSummary.mergeCells('A2:L2');
         wsSummary.getCell('A2').value = `Periode ${startDate} sampai ${endDate}`;
         wsSummary.getCell('A2').font = { italic: true, color: { argb: 'FF425466' }, name: 'Calibri' };
         wsSummary.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -2013,21 +2067,26 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
                     kamar: record.nomor_kamar || '-',
                     peakmeal: 0,
                     snack: 0,
-                    pagi: 0,
-                    siang: 0,
-                    malam: 0,
+                    breakfast: 0,
+                    lunch: 0,
+                    dinner: 0,
+                    supper: 0,
                     total: 0
                 });
             }
 
             const item = summaryMap.get(key);
-            if (normalizeJenis(record.jenis_pengajuan) === 'SNACK') item.snack++;
-            else item.peakmeal++;
-
-            const sesi = normalizeSesi(record.sesi_makan);
-            if (sesi === 'PAGI') item.pagi++;
-            else if (sesi === 'MALAM') item.malam++;
-            else item.siang++;
+            const isSnack = normalizeJenis(record.jenis_pengajuan) === 'SNACK';
+            if (isSnack) {
+                item.snack++;
+            } else {
+                item.peakmeal++;
+                const sesi = normalizeSesi(record.sesi_makan);
+                if (sesi === 'BREAKFAST') item.breakfast++;
+                else if (sesi === 'DINNER') item.dinner++;
+                else if (sesi === 'SUPPER') item.supper++;
+                else item.lunch++;
+            }
 
             item.total++;
         });
@@ -2035,23 +2094,24 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
         const grandTotal = [...summaryMap.values()].reduce((total, item) => ({
             peakmeal: total.peakmeal + item.peakmeal,
             snack: total.snack + item.snack,
-            pagi: total.pagi + item.pagi,
-            siang: total.siang + item.siang,
-            malam: total.malam + item.malam,
+            breakfast: total.breakfast + item.breakfast,
+            lunch: total.lunch + item.lunch,
+            dinner: total.dinner + item.dinner,
+            supper: total.supper + item.supper,
             total: total.total + item.total
-        }), { peakmeal: 0, snack: 0, pagi: 0, siang: 0, malam: 0, total: 0 });
+        }), { peakmeal: 0, snack: 0, breakfast: 0, lunch: 0, dinner: 0, supper: 0, total: 0 });
 
-        wsSummary.mergeCells('A3:K3');
+        wsSummary.mergeCells('A3:L3');
         const outOfPlanTotal = violations.filter(item => String(item.kategori_pelanggaran || '').toUpperCase() === 'DI_LUAR_PLAN').length;
         const wrongLocationTotal = violations.filter(item => String(item.kategori_pelanggaran || '').toUpperCase() === 'SALAH_LOKASI_PESANAN').length;
-        wsSummary.getCell('A3').value = `TOTAL: ${grandTotal.total} | Peakmeal: ${grandTotal.peakmeal} | Snack: ${grandTotal.snack} | Pagi: ${grandTotal.pagi} | Siang: ${grandTotal.siang} | Malam: ${grandTotal.malam} | Di Luar Plan: ${outOfPlanTotal} | Salah Lokasi: ${wrongLocationTotal}`;
+        wsSummary.getCell('A3').value = `TOTAL: ${grandTotal.total} | Total Makan: ${grandTotal.peakmeal} (Breakfast: ${grandTotal.breakfast}, Lunch: ${grandTotal.lunch}, Dinner: ${grandTotal.dinner}, Supper: ${grandTotal.supper}) | Jumlah Snack: ${grandTotal.snack} | Di Luar Plan: ${outOfPlanTotal} | Salah Lokasi: ${wrongLocationTotal}`;
         wsSummary.getCell('A3').font = { bold: true, color: { argb: 'FF0F3D6E' }, name: 'Calibri' };
         wsSummary.getCell('A3').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF7FF' } };
         wsSummary.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
         wsSummary.getCell('A3').border = borderThin;
 
         const summaryHeader = wsSummary.getRow(4);
-        ['No', 'Tujuan Pengantaran', 'Lokasi', 'Mess', 'Kamar', 'Peakmeal', 'Snack', 'Pagi', 'Siang', 'Malam', 'Total'].forEach((header, index) => {
+        ['No', 'Tujuan Pengantaran', 'Lokasi', 'Mess', 'Kamar', 'Breakfast', 'Lunch', 'Dinner', 'Supper', 'Total Makan', 'Jumlah Snack', 'Total Keseluruhan'].forEach((header, index) => {
             summaryHeader.getCell(index + 1).value = header;
         });
         styleHeader(summaryHeader);
@@ -2060,12 +2120,12 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
             .sort((a, b) => b.total - a.total || a.tujuan.localeCompare(b.tujuan))
             .forEach((item, index) => {
                 const row = wsSummary.getRow(5 + index);
-                [index + 1, item.tujuan, item.lokasi, item.mess, item.kamar, item.peakmeal, item.snack, item.pagi, item.siang, item.malam, item.total].forEach((value, cellIndex) => {
+                [index + 1, item.tujuan, item.lokasi, item.mess, item.kamar, item.breakfast, item.lunch, item.dinner, item.supper, item.peakmeal, item.snack, item.total].forEach((value, cellIndex) => {
                     const cell = row.getCell(cellIndex + 1);
                     cell.value = value;
                     cell.border = borderThin;
                     cell.alignment = { horizontal: cellIndex >= 5 || cellIndex === 0 ? 'center' : 'left', vertical: 'middle', wrapText: true };
-                    if (cellIndex === 10) {
+                    if (cellIndex === 11) {
                         cell.font = { bold: true, name: 'Calibri' };
                         cell.fill = subHeaderFill;
                     }
@@ -2073,7 +2133,7 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
             });
         if (summaryMap.size > 0) {
             const totalRow = wsSummary.getRow(5 + summaryMap.size);
-            ['TOTAL', '', '', '', '', grandTotal.peakmeal, grandTotal.snack, grandTotal.pagi, grandTotal.siang, grandTotal.malam, grandTotal.total].forEach((value, cellIndex) => {
+            ['TOTAL', '', '', '', '', grandTotal.breakfast, grandTotal.lunch, grandTotal.dinner, grandTotal.supper, grandTotal.peakmeal, grandTotal.snack, grandTotal.total].forEach((value, cellIndex) => {
                 const cell = totalRow.getCell(cellIndex + 1);
                 cell.value = value;
                 cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
@@ -2083,7 +2143,7 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
             });
         }
         wsSummary.views = [{ state: 'frozen', ySplit: 4 }];
-        wsSummary.autoFilter = `A4:K${Math.max(4, summaryMap.size + 5)}`;
+        wsSummary.autoFilter = `A4:L${Math.max(4, summaryMap.size + 5)}`;
 
         const wsDetail = workbook.addWorksheet('Detail Pengajuan');
         wsDetail.columns = [
