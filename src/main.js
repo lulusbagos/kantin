@@ -1933,6 +1933,22 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
         `);
 
         const records = result.recordset || [];
+        // Normalisasi data lokasi dan mess agar lokasi non-mess (seperti Kantin Prasmanan / Nursery) tidak rancu dengan mess pribadi
+        records.forEach(r => {
+            const isMess = String(r.lokasi_pengantaran || '').toUpperCase().includes('MESS');
+            if (isMess) {
+                const mess = String(r.lokasi_mess || '').trim();
+                const kamar = String(r.nomor_kamar || '').trim();
+                r.lokasi_mess = mess || 'Mess belum terdata';
+                r.nomor_kamar = kamar || 'Kamar belum terdata';
+                r.tujuan_pengantaran = `${r.lokasi_pengantaran} - ${r.lokasi_mess} / ${r.nomor_kamar}`;
+            } else {
+                r.lokasi_mess = '-';
+                r.nomor_kamar = '-';
+                r.tujuan_pengantaran = r.lokasi_pengantaran || '-';
+            }
+        });
+
         const violationRequest = pool.request();
         violationRequest.input('startDate', startDate);
         violationRequest.input('endDate', endDate);
