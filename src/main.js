@@ -2145,6 +2145,247 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
         wsSummary.views = [{ state: 'frozen', ySplit: 4 }];
         wsSummary.autoFilter = `A4:L${Math.max(4, summaryMap.size + 5)}`;
 
+        // Worksheet Snack per Departemen
+        const wsSnackDept = workbook.addWorksheet('Snack per Departemen');
+        wsSnackDept.columns = [
+            { width: 6 },
+            { width: 34 },
+            { width: 22 },
+            { width: 34 },
+            { width: 26 },
+            { width: 36 }
+        ];
+        wsSnackDept.mergeCells('A1:F1');
+        wsSnackDept.getCell('A1').value = 'PEMBAGIAN SNACK PER DEPARTEMEN';
+        wsSnackDept.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        wsSnackDept.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB45309' } };
+        wsSnackDept.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsSnackDept.mergeCells('A2:F2');
+        const snackRecords = records.filter(r => normalizeJenis(r.jenis_pengajuan) === 'SNACK');
+        wsSnackDept.getCell('A2').value = `Periode ${startDate} sampai ${endDate} | Total Pengajuan Snack: ${snackRecords.length} Kotak/Porsi`;
+        wsSnackDept.getCell('A2').font = { italic: true, color: { argb: 'FF425466' }, name: 'Calibri' };
+        wsSnackDept.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const snackHeader = wsSnackDept.getRow(4);
+        ['No', 'Departemen', 'Jumlah Snack (Kotak)', 'Tujuan / Lokasi Pengantaran', 'PIC / Pembuat Pengajuan', 'Keterangan'].forEach((header, index) => {
+            snackHeader.getCell(index + 1).value = header;
+            snackHeader.getCell(index + 1).font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+            snackHeader.getCell(index + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD97706' } };
+            snackHeader.getCell(index + 1).alignment = { horizontal: 'center', vertical: 'middle' };
+            snackHeader.getCell(index + 1).border = borderThin;
+        });
+
+        const snackByDept = new Map();
+        snackRecords.forEach(r => {
+            const dept = r.departemen || '-';
+            if (!snackByDept.has(dept)) {
+                snackByDept.set(dept, {
+                    dept,
+                    count: 0,
+                    locations: new Set(),
+                    creators: new Set()
+                });
+            }
+            const item = snackByDept.get(dept);
+            item.count++;
+            if (r.tujuan_pengantaran || r.lokasi_pengantaran) item.locations.add(r.tujuan_pengantaran || r.lokasi_pengantaran);
+            if (r.created_by) item.creators.add(r.created_by);
+        });
+
+        const snackDeptList = [...snackByDept.values()].sort((a, b) => a.dept.localeCompare(b.dept));
+        snackDeptList.forEach((item, index) => {
+            const row = wsSnackDept.getRow(5 + index);
+            [
+                index + 1,
+                item.dept,
+                item.count,
+                [...item.locations].join(', ') || '-',
+                [...item.creators].join(', ') || '-',
+                `Pembagian snack untuk ${item.dept}`
+            ].forEach((val, cellIdx) => {
+                const cell = row.getCell(cellIdx + 1);
+                cell.value = val;
+                cell.border = borderThin;
+                cell.alignment = { horizontal: cellIdx === 2 || cellIdx === 0 ? 'center' : 'left', vertical: 'middle' };
+            });
+        });
+
+        if (snackDeptList.length > 0) {
+            const totalSnackRow = wsSnackDept.getRow(5 + snackDeptList.length);
+            ['TOTAL', `${snackDeptList.length} Departemen`, snackRecords.length, '', '', ''].forEach((val, cellIdx) => {
+                const cell = totalSnackRow.getCell(cellIdx + 1);
+                cell.value = val;
+                cell.font = { bold: true, name: 'Calibri' };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                cell.border = borderThin;
+                cell.alignment = { horizontal: cellIdx === 2 || cellIdx === 0 ? 'center' : 'left', vertical: 'middle' };
+            });
+        }
+        wsSnackDept.views = [{ state: 'frozen', ySplit: 4 }];
+
+        // Worksheet Label Kotak Departemen
+        const wsLabels = workbook.addWorksheet('Label Kotak Departemen');
+        wsLabels.columns = [
+            { width: 38 },
+            { width: 24 },
+            { width: 18 },
+            { width: 22 }
+        ];
+        wsLabels.mergeCells('A1:D1');
+        wsLabels.getCell('A1').value = 'LABEL KOTAK DISTRIBUSI LOGISTIK PER DEPARTEMEN';
+        wsLabels.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        wsLabels.getCell('A1').fill = headerFill;
+        wsLabels.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsLabels.mergeCells('A2:D2');
+        wsLabels.getCell('A2').value = `Periode ${startDate} sampai ${endDate} | Format label kotak pembagian snack & makanan per departemen (Print Ready)`;
+        wsLabels.getCell('A2').font = { italic: true, color: { argb: 'FF425466' }, name: 'Calibri' };
+        wsLabels.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const allDeptNames = [...new Set(records.map(r => r.departemen || '-'))].sort((a, b) => a.localeCompare(b));
+        let labelRowIdx = 4;
+        allDeptNames.forEach(dept => {
+            const deptRecords = records.filter(r => (r.departemen || '-') === dept);
+            const snackCount = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'SNACK').length;
+            const mealRecords = deptRecords.filter(r => normalizeJenis(r.jenis_pengajuan) === 'PEAKMEAL');
+            
+            const p12Count = mealRecords.filter(r => String(r.lokasi_pengantaran || '').toUpperCase().includes('12') && String(r.lokasi_pengantaran || '').toUpperCase().includes('PRASMANAN')).length;
+            const p33Count = mealRecords.filter(r => String(r.lokasi_pengantaran || '').toUpperCase().includes('33') && String(r.lokasi_pengantaran || '').toUpperCase().includes('PRASMANAN')).length;
+            const pacmealNonKantin = mealRecords.filter(r => !String(r.lokasi_pengantaran || '').toUpperCase().includes('PRASMANAN'));
+            const pacmealCount = pacmealNonKantin.length;
+            const totalMakan = mealRecords.length;
+            const grandTotal = deptRecords.length;
+
+            const startBoxRow = labelRowIdx;
+
+            // 1. Header Box
+            wsLabels.mergeCells(`A${labelRowIdx}:D${labelRowIdx}`);
+            const cellTitle = wsLabels.getCell(`A${labelRowIdx}`);
+            cellTitle.value = `LABEL DISTRIBUSI - ${dept.toUpperCase()}`;
+            cellTitle.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+            cellTitle.fill = headerFill;
+            cellTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 2. Sub Periode
+            wsLabels.mergeCells(`A${labelRowIdx}:D${labelRowIdx}`);
+            const cellSub = wsLabels.getCell(`A${labelRowIdx}`);
+            cellSub.value = `Periode: ${startDate} s/d ${endDate}`;
+            cellSub.font = { italic: true, size: 9, color: { argb: 'FF475569' }, name: 'Calibri' };
+            cellSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            cellSub.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 3. TOTAL SNACK
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellSnackTitle = wsLabels.getCell(`A${labelRowIdx}`);
+            cellSnackTitle.value = 'TOTAL SNACK';
+            cellSnackTitle.font = { bold: true, color: { argb: 'FF92400E' }, name: 'Calibri' };
+            cellSnackTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+            const cellSnackVal = wsLabels.getCell(`D${labelRowIdx}`);
+            cellSnackVal.value = `${snackCount} KOTAK`;
+            cellSnackVal.font = { bold: true, size: 12, color: { argb: 'FF92400E' }, name: 'Calibri' };
+            cellSnackVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+            cellSnackVal.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 4. TOTAL PACMEAL NON-KANTIN
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellPacTitle = wsLabels.getCell(`A${labelRowIdx}`);
+            cellPacTitle.value = 'TOTAL PACMEAL NON KANTIN (PENGANTARAN)';
+            cellPacTitle.font = { bold: true, color: { argb: 'FF0369A1' }, name: 'Calibri' };
+            cellPacTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+            const cellPacVal = wsLabels.getCell(`D${labelRowIdx}`);
+            cellPacVal.value = `${pacmealCount} PORSI`;
+            cellPacVal.font = { bold: true, size: 12, color: { argb: 'FF0369A1' }, name: 'Calibri' };
+            cellPacVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+            cellPacVal.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            if (pacmealCount > 0) {
+                const locSummaryMap = new Map();
+                pacmealNonKantin.forEach(r => {
+                    const l = r.tujuan_pengantaran || r.lokasi_pengantaran || '-';
+                    locSummaryMap.set(l, (locSummaryMap.get(l) || 0) + 1);
+                });
+                const locStr = [...locSummaryMap.entries()].map(([k, v]) => `${k} (${v})`).join('; ');
+                wsLabels.mergeCells(`A${labelRowIdx}:D${labelRowIdx}`);
+                const cellLoc = wsLabels.getCell(`A${labelRowIdx}`);
+                cellLoc.value = `   ↳ Rincian Tujuan: ${locStr}`;
+                cellLoc.font = { italic: true, size: 8, color: { argb: 'FF0284C7' }, name: 'Calibri' };
+                cellLoc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F9FF' } };
+                labelRowIdx++;
+            }
+
+            // 5. KANTIN OFFICE 12 PRASMANAN
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellP12Title = wsLabels.getCell(`A${labelRowIdx}`);
+            cellP12Title.value = 'KANTIN OFFICE 12 PRASMANAN (MAKAN DI TEMPAT)';
+            cellP12Title.font = { bold: true, color: { argb: 'FF6B21A8' }, name: 'Calibri' };
+            cellP12Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } };
+            const cellP12Val = wsLabels.getCell(`D${labelRowIdx}`);
+            cellP12Val.value = `${p12Count} ORANG`;
+            cellP12Val.font = { bold: true, size: 11, color: { argb: 'FF6B21A8' }, name: 'Calibri' };
+            cellP12Val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } };
+            cellP12Val.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 6. KANTIN OFFICE 33 PRASMANAN
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellP33Title = wsLabels.getCell(`A${labelRowIdx}`);
+            cellP33Title.value = 'KANTIN OFFICE 33 PRASMANAN (MAKAN DI TEMPAT)';
+            cellP33Title.font = { bold: true, color: { argb: 'FFC2410C' }, name: 'Calibri' };
+            cellP33Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } };
+            const cellP33Val = wsLabels.getCell(`D${labelRowIdx}`);
+            cellP33Val.value = `${p33Count} ORANG`;
+            cellP33Val.font = { bold: true, size: 11, color: { argb: 'FFC2410C' }, name: 'Calibri' };
+            cellP33Val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } };
+            cellP33Val.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 7. TOTAL MAKAN
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellMakanTitle = wsLabels.getCell(`A${labelRowIdx}`);
+            cellMakanTitle.value = 'TOTAL MAKAN (PACMEAL + PRASMANAN)';
+            cellMakanTitle.font = { bold: true, color: { argb: 'FF1E293B' }, name: 'Calibri' };
+            cellMakanTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+            const cellMakanVal = wsLabels.getCell(`D${labelRowIdx}`);
+            cellMakanVal.value = `${totalMakan} PORSI`;
+            cellMakanVal.font = { bold: true, size: 11, color: { argb: 'FF1E293B' }, name: 'Calibri' };
+            cellMakanVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+            cellMakanVal.alignment = { horizontal: 'center', vertical: 'middle' };
+            labelRowIdx++;
+
+            // 8. TOTAL KEBUTUHAN KESELURUHAN
+            wsLabels.mergeCells(`A${labelRowIdx}:C${labelRowIdx}`);
+            const cellTotTitle = wsLabels.getCell(`A${labelRowIdx}`);
+            cellTotTitle.value = 'TOTAL KEBUTUHAN KESELURUHAN (MAKAN + SNACK)';
+            cellTotTitle.font = { bold: true, size: 11, color: { argb: 'FF166534' }, name: 'Calibri' };
+            cellTotTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            const cellTotVal = wsLabels.getCell(`D${labelRowIdx}`);
+            cellTotVal.value = `${grandTotal}`;
+            cellTotVal.font = { bold: true, size: 13, color: { argb: 'FF166534' }, name: 'Calibri' };
+            cellTotVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            cellTotVal.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // Border di sekeliling kotak
+            for (let r = startBoxRow; r <= labelRowIdx; r++) {
+                for (let c = 1; c <= 4; c++) {
+                    const cell = wsLabels.getCell(r, c);
+                    cell.border = {
+                        top: r === startBoxRow ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.top,
+                        bottom: r === labelRowIdx ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.bottom,
+                        left: c === 1 ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.left,
+                        right: c === 4 ? { style: 'medium', color: { argb: 'FF0F3D6E' } } : borderThin.right
+                    };
+                }
+            }
+
+            labelRowIdx += 3;
+        });
+
+
         const wsDetail = workbook.addWorksheet('Detail Pengajuan');
         wsDetail.columns = [
             { width: 6 },
