@@ -219,29 +219,68 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_) {}
     }
 
-    /**
-     * Mengucapkan pesan suara dalam Bahasa Indonesia (SpeechSynthesis)
-     */
-    function speakVoice(text) {
-        if (!isVoiceEnabled || !text) return;
-        if (!('speechSynthesis' in window)) return;
+    let currentVoiceAudio = null;
 
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            try { window.speechSynthesis.getVoices(); } catch (_) {}
+        };
+    }
+
+    /**
+     * Fallback ke SpeechSynthesis bawaan browser/sistem jika offline
+     */
+    function speakFallbackSpeechSynthesis(text) {
+        if (!('speechSynthesis' in window)) return;
         try {
-            window.speechSynthesis.cancel();
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+            }
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'id-ID';
-            utterance.rate = 1.05;
+            utterance.rate = 1.0;
             utterance.pitch = 1.0;
 
             const voices = window.speechSynthesis.getVoices();
-            const idVoice = voices.find(v => v.lang === 'id-ID' || (v.lang && v.lang.toLowerCase().startsWith('id')));
+            const idVoice = voices.find(v => 
+                (v.lang && (v.lang.toLowerCase() === 'id-id' || v.lang.toLowerCase().startsWith('id'))) ||
+                (v.name && v.name.toLowerCase().includes('indonesia'))
+            );
             if (idVoice) {
                 utterance.voice = idVoice;
             }
 
             window.speechSynthesis.speak(utterance);
         } catch (err) {
-            console.warn('Speech synthesis error:', err);
+            console.warn('Fallback SpeechSynthesis error:', err);
+        }
+    }
+
+    /**
+     * Mengucapkan pesan suara dalam Bahasa Indonesia yang jernih dan fasih
+     * Menggunakan Google Natural Indonesian TTS dengan fallback otomatis ke SpeechSynthesis lokal
+     */
+    function speakVoice(text) {
+        if (!isVoiceEnabled || !text) return;
+
+        try {
+            if (currentVoiceAudio) {
+                currentVoiceAudio.pause();
+                currentVoiceAudio.currentTime = 0;
+                currentVoiceAudio = null;
+            }
+
+            const encoded = encodeURIComponent(text.trim());
+            const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=${encoded}`;
+            const audio = new Audio(audioUrl);
+            audio.playbackRate = 1.05;
+            currentVoiceAudio = audio;
+
+            audio.play().catch(() => {
+                speakFallbackSpeechSynthesis(text);
+            });
+        } catch (_) {
+            speakFallbackSpeechSynthesis(text);
         }
     }
 
