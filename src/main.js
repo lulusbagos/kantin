@@ -2521,9 +2521,15 @@ api.get('/api/download-peakmeal-report', async (req, res) => {
                 cellDept.font = { bold: true, size: 11, color: { argb: 'FF065F46' }, name: 'Calibri' };
                 stickerRowIdx++;
 
-                // Jenis & Jumlah
-                wsStickers.getCell(`A${stickerRowIdx}`).value = 'JENIS KEBUTUHAN';
-                wsStickers.getCell(`B${stickerRowIdx}`).value = 'SNACK';
+                // Sesi & Jumlah
+                const snackLunchCount = snackRecords.filter(r => (r.sesi_makan || '').toUpperCase().includes('LUNCH') || (r.sesi_makan || '').toUpperCase().includes('SIANG')).length;
+                const snackSupperCount = snackRecords.filter(r => (r.sesi_makan || '').toUpperCase().includes('SUPPER')).length;
+                const snackSesiLabel = snackLunchCount > 0 && snackSupperCount > 0
+                    ? `SNACK (Lunch: ${snackLunchCount}, Supper: ${snackSupperCount})`
+                    : snackSupperCount > 0 ? 'SNACK (SUPPER)' : 'SNACK (LUNCH)';
+
+                wsStickers.getCell(`A${stickerRowIdx}`).value = 'JENIS & SESI';
+                wsStickers.getCell(`B${stickerRowIdx}`).value = snackSesiLabel;
                 wsStickers.getCell(`C${stickerRowIdx}`).value = 'JUMLAH KOTAK';
                 wsStickers.getCell(`C${stickerRowIdx}`).font = { bold: true, name: 'Calibri' };
                 const cellQty = wsStickers.getCell(`D${stickerRowIdx}`);
